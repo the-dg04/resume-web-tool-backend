@@ -16,11 +16,11 @@ router.get('/', async (req, res) => {
 
 // POST a new company (protected)
 router.post('/', isLoggedIn, async (req, res) => {
-    const { name, location, linkedin_url } = req.body;
+    const { name, location, linkedin_url, email } = req.body;
     try {
         const { rows } = await db.query(
-            'INSERT INTO Companies (name, location, linkedin_url) VALUES ($1, $2, $3) RETURNING *',
-            [name, location, linkedin_url]
+            'INSERT INTO Companies (name, location, linkedin_url, email) VALUES ($1, $2, $3, $4) RETURNING *',
+            [name, location, linkedin_url, email]
         );
         res.status(201).json(rows[0]);
     } catch (err) {
@@ -31,13 +31,24 @@ router.post('/', isLoggedIn, async (req, res) => {
 
 module.exports = router;
  
-// Company self-update details (name, location, linkedin_url) for the signed-in company
+// Get signed-in company profile
+router.get('/me', isLoggedIn, requireCompany, async (req, res) => {
+    try {
+        const { rows } = await db.query('SELECT company_id, name, location, linkedin_url FROM Companies WHERE company_id = $1', [req.company.company_id]);
+        res.json(rows[0]);
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).send('Server Error');
+    }
+});
+
+// Company self-update details (location, linkedin_url) for the signed-in company
 router.patch('/me', isLoggedIn, requireCompany, async (req, res) => {
-    const { name, location, linkedin_url } = req.body;
+    const { location, linkedin_url } = req.body;
     try {
         const { rows } = await db.query(
-            'UPDATE Companies SET name = COALESCE($1, name), location = COALESCE($2, location), linkedin_url = COALESCE($3, linkedin_url) WHERE company_id = $4 RETURNING *',
-            [name || null, location || null, linkedin_url || null, req.company.company_id]
+            'UPDATE Companies SET location = COALESCE($1, location), linkedin_url = COALESCE($2, linkedin_url) WHERE company_id = $3 RETURNING company_id, name, location, linkedin_url',
+            [location || null, linkedin_url || null, req.company.company_id]
         );
         res.json(rows[0]);
     } catch (err) {

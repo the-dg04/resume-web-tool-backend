@@ -27,7 +27,8 @@ CREATE TABLE Companies (
     company_id SERIAL PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     location VARCHAR(255),
-    linkedin_url VARCHAR(255)
+    linkedin_url VARCHAR(255),
+    email VARCHAR(255) UNIQUE NOT NULL
 );
 
 -- Roles Table

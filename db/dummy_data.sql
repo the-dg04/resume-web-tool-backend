@@ -10,11 +10,11 @@ INSERT INTO Users ( name, email, type) VALUES
 
 -- 2. Populate Companies
 -- We'll create 4 sample companies.
-INSERT INTO Companies (name, location, linkedin_url) VALUES
-('Innovatech Solutions', 'San Francisco, CA', 'https://linkedin.com/company/innovatech-solutions'),
-('DataWise Inc.', 'New York, NY', 'https://linkedin.com/company/datawise-inc'),
-('QuantumLeap', 'Austin, TX', 'https://linkedin.com/company/quantumleap'),
-('NextGen Systems', 'Remote', 'https://linkedin.com/company/nextgen-systems');
+INSERT INTO Companies (name, location, linkedin_url, email) VALUES
+('Innovatech Solutions', 'San Francisco, CA', 'https://linkedin.com/company/innovatech-solutions', 'admin@innovatech.com'),
+('DataWise Inc.', 'New York, NY', 'https://linkedin.com/company/datawise-inc', 'admin@datawise.com'),
+('QuantumLeap', 'Austin, TX', 'https://linkedin.com/company/quantumleap', 'admin@quantumleap.com'),
+('NextGen Systems', 'Remote', 'https://linkedin.com/company/nextgen-systems', 'admin@nextgensystems.com');
 
 -- 3. Populate Resumes
 -- Assuming user_ids are 1, 2, 3 from the inserts above.

@@ -88,7 +88,7 @@ export default function Home() {
   const [role, setRole] = useState<"user" | "company" | null>(null);
 
   const [activeTab, setActiveTab] = useState<
-    "roles" | "companies" | "resumes" | "applications" | "admin"
+    "roles" | "companies" | "resumes" | "applications" | "admin" | "profile"
   >("roles");
 
   const [roles, setRoles] = useState<Role[]>([]);
@@ -136,6 +136,9 @@ export default function Home() {
   const [companyAppsLoading, setCompanyAppsLoading] = useState(false);
   const [companyAppsError, setCompanyAppsError] = useState<string | null>(null);
 
+  const [userProfile, setUserProfile] = useState<{ user_id: number; name: string; email: string; type: string } | null>(null);
+  const [companyProfile, setCompanyProfile] = useState<{ company_id: number; name: string; location: string | null; linkedin_url: string | null } | null>(null);
+
   useEffect(() => {
     setIsHydrated(true);
     try {
@@ -152,6 +155,36 @@ export default function Home() {
       }
     } catch {}
   }, []);
+
+  useEffect(() => {
+    if (!token) return;
+    if (role === "company") return; // company has profile in admin section
+    // fetch user profile
+    (async () => {
+      try {
+        const p = await apiFetch<{ user_id: number; name: string; email: string; type: string }>(
+          "/auth/me",
+          {},
+          true
+        );
+        setUserProfile(p);
+      } catch {}
+    })();
+  }, [token, role]);
+
+  useEffect(() => {
+    if (!token || role !== "company") return;
+    (async () => {
+      try {
+        const c = await apiFetch<{ company_id: number; name: string; location: string | null; linkedin_url: string | null }>(
+          "/api/companies/me",
+          {},
+          true
+        );
+        setCompanyProfile(c);
+      } catch {}
+    })();
+  }, [token, role]);
 
   async function apiFetch<T>(path: string, init: RequestInit = {}, auth = false) {
     const headers: Record<string, string> = {
@@ -369,6 +402,7 @@ export default function Home() {
               <span className="text-lg font-semibold tracking-tight text-white/90">Interview Portal</span>
             </div>
             <div className="flex items-center gap-2">
+              <a href="/profile" className="rounded-md border border-white/10 bg-white/5 px-3 py-1.5 text-sm text-white/80 hover:bg-white/10 transition">Profile</a>
               {isHydrated && token ? (
                 <button
                   onClick={handleLogout}
@@ -462,54 +496,14 @@ export default function Home() {
           )}
           {role !== "company" && (
             <>
-              <button
-                onClick={() => setActiveTab("roles")}
-                className={cx(
-                  "rounded-full border px-4 py-1.5 text-sm transition",
-                  activeTab === "roles"
-                    ? "border-transparent bg-white/15 text-white shadow-[0_0_24px_rgba(255,255,255,0.15)]"
-                    : "border-white/10 bg-white/5 text-white/70 hover:bg-white/10"
-                )}
-              >
-                Explore Roles
-              </button>
-              <button
-                onClick={() => setActiveTab("companies")}
-                className={cx(
-                  "rounded-full border px-4 py-1.5 text-sm transition",
-                  activeTab === "companies"
-                    ? "border-transparent bg-white/15 text-white shadow-[0_0_24px_rgba(255,255,255,0.15)]"
-                    : "border-white/10 bg-white/5 text-white/70 hover:bg-white/10"
-                )}
-              >
-                Companies
-              </button>
+              <button onClick={() => setActiveTab("roles")} className={cx("rounded-full border px-4 py-1.5 text-sm transition", activeTab === "roles" ? "border-transparent bg-white/15 text-white shadow-[0_0_24px_rgba(255,255,255,0.15)]" : "border-white/10 bg-white/5 text-white/70 hover:bg-white/10")}>Explore Roles</button>
+              <button onClick={() => setActiveTab("companies")} className={cx("rounded-full border px-4 py-1.5 text-sm transition", activeTab === "companies" ? "border-transparent bg-white/15 text-white shadow-[0_0_24px_rgba(255,255,255,0.15)]" : "border-white/10 bg-white/5 text-white/70 hover:bg-white/10")}>Companies</button>
             </>
           )}
           {role !== "company" && (
             <>
-              <button
-                onClick={() => setActiveTab("resumes")}
-                className={cx(
-                  "rounded-full border px-4 py-1.5 text-sm transition",
-                  activeTab === "resumes"
-                    ? "border-transparent bg-white/15 text-white shadow-[0_0_24px_rgba(255,255,255,0.15)]"
-                    : "border-white/10 bg-white/5 text-white/70 hover:bg-white/10"
-                )}
-              >
-                Resumes
-              </button>
-              <button
-                onClick={() => setActiveTab("applications")}
-                className={cx(
-                  "rounded-full border px-4 py-1.5 text-sm transition",
-                  activeTab === "applications"
-                    ? "border-transparent bg-white/15 text-white shadow-[0_0_24px_rgba(255,255,255,0.15)]"
-                    : "border-white/10 bg-white/5 text-white/70 hover:bg-white/10"
-                )}
-              >
-                Applications
-              </button>
+              <button onClick={() => setActiveTab("resumes")} className={cx("rounded-full border px-4 py-1.5 text-sm transition", activeTab === "resumes" ? "border-transparent bg-white/15 text-white shadow-[0_0_24px_rgba(255,255,255,0.15)]" : "border-white/10 bg-white/5 text-white/70 hover:bg-white/10")}>Resumes</button>
+              <button onClick={() => setActiveTab("applications")} className={cx("rounded-full border px-4 py-1.5 text-sm transition", activeTab === "applications" ? "border-transparent bg-white/15 text-white shadow-[0_0_24px_rgba(255,255,255,0.15)]" : "border-white/10 bg-white/5 text-white/70 hover:bg-white/10")}>Applications</button>
             </>
           )}
         </nav>
@@ -864,36 +858,7 @@ export default function Home() {
                       </button>
                     </div>
 
-                    <div className="mb-6 rounded-lg border border-white/10 bg-white/5 p-3">
-                      <div className="mb-2 text-xs text-white/70">Update Company Profile</div>
-                      <form
-                        onSubmit={async (e) => {
-                          e.preventDefault();
-                          const form = new FormData(e.currentTarget as HTMLFormElement);
-                          const name = String(form.get("name") || "").trim() || undefined;
-                          const location = String(form.get("location") || "").trim() || undefined;
-                          const linkedin_url = String(form.get("linkedin_url") || "").trim() || undefined;
-                          try {
-                            await apiFetch(
-                              `/api/companies/me`,
-                              { method: "PATCH", body: JSON.stringify({ name, location, linkedin_url }) },
-                              true
-                            );
-                            showToast("Company updated");
-                          } catch {
-                            showToast("Update failed");
-                          }
-                        }}
-                        className="grid grid-cols-1 gap-2 sm:grid-cols-3"
-                      >
-                        <input name="name" placeholder="Name" className="rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm outline-none" />
-                        <input name="location" placeholder="Location" className="rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm outline-none" />
-                        <input name="linkedin_url" placeholder="Contact/LinkedIn" className="rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm outline-none" />
-                        <div className="sm:col-span-3 flex justify-end">
-                          <button type="submit" className="rounded-md bg-white/10 px-3 py-2 text-sm hover:bg-white/15">Save</button>
-                        </div>
-                      </form>
-                    </div>
+                    {/* Company profile editing moved to /profile per requirements */}
 
                     {companyAppsLoading ? (
                       <div className="text-white/70">Loading…</div>

@@ -1,5 +1,6 @@
 const router = require("express").Router();
 const isLoggedIn = require("../middleware/isLoggedIn");
+const { requireUser } = require("../middleware/requireRole");
 const db = require("../db/db");
 const serde = require("../utils/serde");
 
@@ -28,17 +29,16 @@ router.post("/login", async (req, res) => {
 router.post("/login-company", async (req, res) => {
   const { name, email } = req.body;
 
-  // Upsert company by email in Companies as an owner record. If you prefer separate table, adapt accordingly
-  // We will store company name in Companies.name and use email to identify admin (optional if schema expands later)
+  // Upsert company by email in Companies as an owner record
   let company = await db.query(
-    "SELECT * FROM Companies WHERE linkedin_url = $1 LIMIT 1",
+    "SELECT * FROM Companies WHERE email = $1 LIMIT 1",
     [email]
   );
 
   if (company.rows.length === 0) {
     const inserted = await db.query(
-      "INSERT INTO Companies (name, location, linkedin_url) VALUES ($1, $2, $3) RETURNING *",
-      [name || "Company", null, email]
+      "INSERT INTO Companies (name, location, linkedin_url, email) VALUES ($1, $2, $3, $4) RETURNING *",
+      [name || "Company", null, null, email]
     );
     company = { rows: inserted.rows };
   }
@@ -48,3 +48,19 @@ router.post("/login-company", async (req, res) => {
 });
 
 module.exports = router;
+
+// Get current user profile
+router.get("/me", isLoggedIn, requireUser, async (req, res) => {
+  try {
+    const { rows } = await db.query(
+      "SELECT user_id, name, email, type, created_at FROM Users WHERE user_id = $1",
+      [req.user.user_id]
+    );
+    res.json(rows[0]);
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send("Server Error");
+  }
+});
+
+// No user profile update per requirements
