@@ -50,6 +50,8 @@ type CompanyApplication = {
   user_id: number;
   user_name: string;
   user_email: string;
+  resume_name?: string | null;
+  resume_url: string;
   job_description: string;
   company_name: string;
 };
@@ -765,6 +767,7 @@ export default function Home() {
                         );
                         showToast("Role posted");
                         setPostRoleForm({
+                          company_id: "",
                           job_description: "",
                           pay: "",
                           location: "",
