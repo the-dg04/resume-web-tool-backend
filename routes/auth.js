@@ -1,30 +1,28 @@
-const router = require('express').Router();
-const passport = require('passport');
-const isLoggedIn = require('../middleware/isLoggedIn');
+const router = require("express").Router();
+const isLoggedIn = require("../middleware/isLoggedIn");
+const db = require("../db/db");
+const serde = require("../utils/serde");
 
-// Route to start the Google authentication process
-router.get('/google', passport.authenticate('google', {
-    scope: ['profile', 'email'] // What we want to get from Google
-}));
+router.post("/login", async (req, res) => {
+  const { name, email } = req.body;
 
-// Google's callback URL
-router.get('/google/callback', passport.authenticate('google', {
-    successRedirect: process.env.CLIENT_HOME_PAGE_URL,
-    failureRedirect: '/auth/login/failed'
-}));
+  const { rows } = await db.query(
+    "SELECT * FROM Users WHERE email = $1 LIMIT 1",
+    [email]
+  );
 
-router.get('/login/failed', (req, res) => {
-    res.status(401).json({ message: 'Login failed.' });
-});
+  const token = serde.serialize(email);
 
-router.get('/logout', (req, res) => {
-    req.logout(); // Removes req.user and clears the session
-    res.redirect(process.env.CLIENT_HOME_PAGE_URL);
-});
+  if (rows.length == 0) {
+    const { rows } = await db.query(
+      "INSERT INTO Users (name, email) VALUES ($1, $2) RETURNING *",
+      [name, email]
+    );
 
-// Route to get current user data
-router.get('/current-user', isLoggedIn, (req, res) => {
-    res.json(req.user);
+    res.status(201).json({ token: token });
+  } else {
+    res.status(200).json({ token: token });
+  }
 });
 
 module.exports = router;

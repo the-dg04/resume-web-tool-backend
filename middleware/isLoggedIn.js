@@ -1,7 +1,12 @@
+const jwt = require("jsonwebtoken");
+
 module.exports = (req, res, next) => {
-    if (req.user) {
-      next();
-    } else {
-      res.status(401).json({ message: 'Unauthorized: You must be logged in.' });
-    }
-  };
+  try {
+    const token = req.get("Authorization").slice(7);
+    const email = jwt.verify(token, process.env.JWT_SECRET);
+    res.email = email;
+    next();
+  } catch (err) {
+    res.json({ message: "invalid token" }).status(400);
+  }
+};

@@ -3,10 +3,10 @@
 
 -- 1. Populate Users
 -- We'll create 3 sample users.
-INSERT INTO Users (google_id, name, email, phone, age, linkedin_url, type) VALUES
-('google|101234567890123456789', 'Alice Johnson', 'alice.j@example.com', '555-0101', 28, 'https://linkedin.com/in/alicejohnson', 'premium'),
-('google|202345678901234567890', 'Bob Williams', 'bob.w@example.com', '555-0102', 24, 'https://linkedin.com/in/bobwilliams', 'free'),
-('google|303456789012345678901', 'Charlie Brown', 'charlie.b@example.com', '555-0103', 31, 'https://linkedin.com/in/charliebrown', 'free');
+INSERT INTO Users ( name, email, type) VALUES
+( 'Alice Johnson', 'alice.j@example.com', 'premium'),
+( 'Bob Williams', 'bob.w@example.com', 'free'),
+( 'Charlie Brown', 'charlie.b@example.com', 'free');
 
 -- 2. Populate Companies
 -- We'll create 4 sample companies.
@@ -19,11 +19,11 @@ INSERT INTO Companies (name, location, linkedin_url) VALUES
 -- 3. Populate Resumes
 -- Assuming user_ids are 1, 2, 3 from the inserts above.
 -- Alice (user_id=1) has two resumes, Bob (user_id=2) and Charlie (user_id=3) each have one.
-INSERT INTO Resumes (user_id, resume_url) VALUES
-(1, 'https://example-storage.com/resumes/alice_johnson_swe_v2.pdf'),
-(1, 'https://example-storage.com/resumes/alice_johnson_pm_v1.pdf'),
-(2, 'https://example-storage.com/resumes/bob_williams_datasci.pdf'),
-(3, 'https://example-storage.com/resumes/charlie_brown_devops.pdf');
+INSERT INTO Resumes (user_id, resume_name, resume_url) VALUES
+(1, 'resumE', 'https://example-storage.com/resumes/alice_johnson_swe_v2.pdf'),
+(1, 'resumE', 'https://example-storage.com/resumes/alice_johnson_pm_v1.pdf'),
+(2, 'resumE', 'https://example-storage.com/resumes/bob_williams_datasci.pdf'),
+(3, 'resumE', 'https://example-storage.com/resumes/charlie_brown_devops.pdf');
 
 -- 4. Populate Roles
 -- Assuming company_ids are 1, 2, 3, 4 from the inserts above.

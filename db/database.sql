@@ -6,12 +6,8 @@
 -- Added google_id to store the unique ID from Google
 CREATE TABLE Users (
     user_id SERIAL PRIMARY KEY,
-    google_id VARCHAR(255) UNIQUE NOT NULL,
     name VARCHAR(255) NOT NULL,
     email VARCHAR(255) UNIQUE NOT NULL,
-    phone VARCHAR(50),
-    age INT,
-    linkedin_url VARCHAR(255),
     type VARCHAR(10) DEFAULT 'free' CHECK (type IN ('free', 'premium')),
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -20,6 +16,7 @@ CREATE TABLE Users (
 CREATE TABLE Resumes (
     resume_id SERIAL PRIMARY KEY,
     user_id INT NOT NULL,
+    resume_name VARCHAR(255) NOT NULL,
     resume_url VARCHAR(255) NOT NULL,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     FOREIGN KEY (user_id) REFERENCES Users(user_id) ON DELETE CASCADE
