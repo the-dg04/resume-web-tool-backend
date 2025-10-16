@@ -1,6 +1,7 @@
 const router = require('express').Router();
 const db = require('../db/db');
 const isLoggedIn = require('../middleware/isLoggedIn');
+const { requireCompany } = require('../middleware/requireRole');
 
 // GET all companies
 router.get('/', async (req, res) => {
@@ -29,3 +30,18 @@ router.post('/', isLoggedIn, async (req, res) => {
 });
 
 module.exports = router;
+ 
+// Company self-update details (name, location, linkedin_url) for the signed-in company
+router.patch('/me', isLoggedIn, requireCompany, async (req, res) => {
+    const { name, location, linkedin_url } = req.body;
+    try {
+        const { rows } = await db.query(
+            'UPDATE Companies SET name = COALESCE($1, name), location = COALESCE($2, location), linkedin_url = COALESCE($3, linkedin_url) WHERE company_id = $4 RETURNING *',
+            [name || null, location || null, linkedin_url || null, req.company.company_id]
+        );
+        res.json(rows[0]);
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).send('Server Error');
+    }
+});
