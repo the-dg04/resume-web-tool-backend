@@ -51,8 +51,8 @@ export default function MockTestPage() {
   const [allQuestions, setAllQuestions] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitted, setIsSubmitted] = useState(false);
-  const router = useRouter()
-  
+  const router = useRouter();
+
   // --- Handlers ---
 
   // FIX: Wrapped handleSubmit in useCallback for stability and to prevent unnecessary re-renders.
@@ -65,6 +65,17 @@ export default function MockTestPage() {
     localStorage.removeItem("mocktest_endTime");
     localStorage.removeItem("mocktest_started");
 
+    localStorage.setItem(
+      "postmocktest",
+      JSON.stringify({
+        questions: allQuestions,
+        answers: answers,
+        testDuration: 30 * 60, // 
+        attemptDuration: 30 * 60 - timeLeft,
+        difficulty: "actual", // novice | intermediate | actual | challenge
+      })
+    );
+
     setIsSubmitted(true); // Show submission confirmation screen
     setTimeLeft(0); // Stop the timer
   }, [answers]);
@@ -75,7 +86,7 @@ export default function MockTestPage() {
   useEffect(() => {
     // If a 'started' flag exists in localStorage, it means the user is reloading
     // an in-progress test. The desired behavior is to end that session and redirect.
-    if (localStorage.getItem("mocktest_started")==="true") {
+    if (localStorage.getItem("mocktest_started") === "true") {
       // Clear all remnants of the old test.
       localStorage.removeItem("mocktest_questions");
       localStorage.removeItem("mocktest_answers");
@@ -83,14 +94,14 @@ export default function MockTestPage() {
       localStorage.removeItem("mocktest_started");
       // Redirect to the page where new tests are initiated.
       // window.location.href = "/premocktest";
-      router.push("/premocktest")
+      router.push("/premocktest");
       return; // Stop further execution in this component.
     }
 
     // 1. Check for question data. If it's missing, the user probably navigated here directly.
     const questionsDataString = localStorage.getItem("mocktest_questions");
     if (!questionsDataString) {
-      router.push("/premocktest")
+      router.push("/premocktest");
       return;
     }
 
@@ -102,11 +113,21 @@ export default function MockTestPage() {
     try {
       const questionsData = JSON.parse(questionsDataString);
       const flattenQuestions = (data) => {
-        const open = data.questions.open_questions.map((q) => ({ type: "open", text: q }));
-        const mcqs = data.questions.mcq.map((q) => ({ type: "mcq", text: q.question, options: q.options }));
+        const open = data.questions.open_questions.map((q) => ({
+          type: "open",
+          text: q,
+        }));
+        const mcqs = data.questions.mcq.map((q) => ({
+          type: "mcq",
+          text: q.question,
+          options: q.options,
+        }));
         return [...open, ...mcqs];
       };
+
       setAllQuestions(flattenQuestions(questionsData));
+
+      // console.log(flattenQuestions(questionsData))
     } catch (error) {
       console.error("Failed to parse mock test data:", error);
       localStorage.removeItem("mocktest_questions");
@@ -158,17 +179,30 @@ export default function MockTestPage() {
   if (isSubmitted) {
     return (
       <div className="min-h-screen bg-black text-white flex flex-col justify-center items-center text-center p-8">
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-24 w-24 text-green-400 mb-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          className="h-24 w-24 text-green-400 mb-6"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+          />
         </svg>
         <h1 className="text-4xl font-bold mb-2">Test Submitted!</h1>
-        <p className="text-white/70 text-lg">Your answers have been recorded. You can now safely close this page.</p>
-         <button
-            onClick={() => window.location.href = '/premocktest'}
-            className="mt-8 px-8 py-3 rounded-md bg-blue-600 text-white font-bold hover:bg-blue-500 transition-colors shadow-lg shadow-blue-600/20"
-          >
-            Take Another Test
-          </button>
+        <p className="text-white/70 text-lg">
+          Your answers have been recorded. You can now safely close this page.
+        </p>
+        <button
+          onClick={() => router.push("/postmocktest")}
+          className="mt-8 px-8 py-3 rounded-md bg-blue-600 text-white font-bold hover:bg-blue-500 transition-colors shadow-lg shadow-blue-600/20"
+        >
+          View Analysis
+        </button>
       </div>
     );
   }
@@ -204,8 +238,19 @@ export default function MockTestPage() {
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
               className="p-2 rounded-md bg-white/5 hover:bg-white/10 transition-colors"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-6 w-6"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 6h16M4 12h16M4 18h16"
+                />
               </svg>
             </button>
             <h1 className="text-2xl font-semibold text-white/90">
@@ -229,7 +274,9 @@ export default function MockTestPage() {
             <textarea
               // FIX: Use `|| ""` to prevent React's uncontrolled/controlled component warning.
               value={answers[currentQuestionIndex] || ""}
-              onChange={(e) => handleAnswerChange(currentQuestionIndex, e.target.value)}
+              onChange={(e) =>
+                handleAnswerChange(currentQuestionIndex, e.target.value)
+              }
               placeholder="Type your answer here..."
               className="w-full h-48 p-3 bg-black/30 border border-white/10 rounded-lg text-white/80 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
             />
@@ -249,7 +296,9 @@ export default function MockTestPage() {
                     name={`question-${currentQuestionIndex}`}
                     value={option}
                     checked={answers[currentQuestionIndex] === option}
-                    onChange={(e) => handleAnswerChange(currentQuestionIndex, e.target.value)}
+                    onChange={(e) =>
+                      handleAnswerChange(currentQuestionIndex, e.target.value)
+                    }
                     className="w-4 h-4 text-blue-600 bg-gray-700 border-gray-600 focus:ring-blue-600 ring-offset-gray-800 focus:ring-2"
                   />
                   <span className="ml-3 text-white/90">{option}</span>
@@ -270,7 +319,11 @@ export default function MockTestPage() {
               Previous
             </button>
             <button
-              onClick={() => setCurrentQuestionIndex((p) => Math.min(allQuestions.length - 1, p + 1))}
+              onClick={() =>
+                setCurrentQuestionIndex((p) =>
+                  Math.min(allQuestions.length - 1, p + 1)
+                )
+              }
               disabled={currentQuestionIndex === allQuestions.length - 1}
               className="ml-4 px-6 py-2 rounded-md bg-white/10 text-sm hover:bg-white/15 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
@@ -289,5 +342,3 @@ export default function MockTestPage() {
     </div>
   );
 }
-
-

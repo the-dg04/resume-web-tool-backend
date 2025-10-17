@@ -5,56 +5,7 @@ import { GoogleOAuthProvider, GoogleLogin } from "@react-oauth/google";
 import { jwtDecode } from "jwt-decode";
 import { useCookies } from "next-client-cookies";
 import { useRouter } from "next/navigation";
-
-type Role = {
-  role_id: number;
-  company_id: number;
-  job_description: string;
-  pay: string | null;
-  location: string | null;
-  start_date?: string | null;
-  application_end_date?: string | null;
-  hours_per_week?: number | null;
-  company_name: string;
-};
-
-type Company = {
-  company_id: number;
-  name: string;
-  location?: string | null;
-  linkedin_url?: string | null;
-};
-
-type Resume = {
-  resume_id: number;
-  user_id: number;
-  resume_name?: string | null;
-  resume_url: string;
-  created_at?: string;
-};
-
-type Application = {
-  application_id: number;
-  status: "applied" | "reviewing" | "interviewing" | "rejected" | "hired";
-  created_at: string;
-  job_description: string;
-  company_name: string;
-};
-
-type CompanyApplication = {
-  application_id: number;
-  status: "applied" | "reviewing" | "interviewing" | "rejected" | "hired";
-  created_at: string;
-  role_id: number;
-  resume_id: number;
-  user_id: number;
-  user_name: string;
-  user_email: string;
-  resume_name?: string | null;
-  resume_url: string;
-  job_description: string;
-  company_name: string;
-};
+import supabaseFileUpload from "./utils/supabaseFileUpload";
 
 const BACKEND_URL =
   process.env.NEXT_PUBLIC_BACKEND_URL ||
@@ -62,11 +13,11 @@ const BACKEND_URL =
   "http://localhost:5000";
 const OAUTH_CLIENT_ID = process.env.NEXT_PUBLIC_OAUTH_CLIENT_ID || "";
 
-function cx(...classes: Array<string | false | null | undefined>) {
+function cx(...classes) {
   return classes.filter(Boolean).join(" ");
 }
 
-function SectionHeader({ title, subtitle }: { title: string; subtitle?: string }) {
+function SectionHeader({ title, subtitle }) {
   return (
     <div className="mb-6">
       <h2 className="text-xl sm:text-2xl font-semibold tracking-tight text-white/90">
@@ -80,48 +31,46 @@ function SectionHeader({ title, subtitle }: { title: string; subtitle?: string }
 }
 
 export default function Home() {
-  const [token, setToken] = useState<string | null>(null);
+  const [token, setToken] = useState(null);
   const [isHydrated, setIsHydrated] = useState(false);
   const cookies = useCookies();
   const router = useRouter();
 
-  const [role, setRole] = useState<"user" | "company" | null>(null);
+  const [role, setRole] = useState(null);
 
-  const [activeTab, setActiveTab] = useState<
-    "roles" | "companies" | "resumes" | "applications" | "admin" | "profile"
-  >("roles");
+  const [activeTab, setActiveTab] = useState("roles");
 
-  const [roles, setRoles] = useState<Role[]>([]);
+  const [roles, setRoles] = useState([]);
   const [rolesLoading, setRolesLoading] = useState(false);
-  const [rolesError, setRolesError] = useState<string | null>(null);
+  const [rolesError, setRolesError] = useState(null);
   const [roleSearch, setRoleSearch] = useState("");
-  const [roleCompanyFilter, setRoleCompanyFilter] = useState<string>("");
+  const [roleCompanyFilter, setRoleCompanyFilter] = useState("");
 
-  const [companies, setCompanies] = useState<Company[]>([]);
+  const [companies, setCompanies] = useState([]);
   const [companiesLoading, setCompaniesLoading] = useState(false);
-  const [companiesError, setCompaniesError] = useState<string | null>(null);
+  const [companiesError, setCompaniesError] = useState(null);
 
-  const [resumes, setResumes] = useState<Resume[]>([]);
+  const [resumes, setResumes] = useState([]);
   const [resumesLoading, setResumesLoading] = useState(false);
-  const [resumesError, setResumesError] = useState<string | null>(null);
-  const [newResumeUrl, setNewResumeUrl] = useState("");
+  const [resumesError, setResumesError] = useState(null);
+  const [newResumeFile, setNewResumeFile] = useState(null);
   const [newResumeName, setNewResumeName] = useState("");
 
-  const [applications, setApplications] = useState<Application[]>([]);
+  const [applications, setApplications] = useState([]);
   const [applicationsLoading, setApplicationsLoading] = useState(false);
-  const [applicationsError, setApplicationsError] = useState<string | null>(null);
+  const [applicationsError, setApplicationsError] = useState(null);
 
-  const [toast, setToast] = useState<string | null>(null);
-  const [authMode, setAuthMode] = useState<"user" | "company">("user");
+  const [toast, setToast] = useState(null);
+  const [authMode, setAuthMode] = useState("user");
 
   const [applyOpen, setApplyOpen] = useState(false);
-  const [applyRole, setApplyRole] = useState<Role | null>(null);
-  const [selectedResumeId, setSelectedResumeId] = useState<number | null>(null);
+  const [applyRole, setApplyRole] = useState(null);
+  const [selectedResumeId, setSelectedResumeId] = useState(null);
   const [applySubmitting, setApplySubmitting] = useState(false);
 
   // Company Admin
-  const [adminTab, setAdminTab] = useState<"postRole" | "reviewApps">("postRole");
-  const [adminCompanyId, setAdminCompanyId] = useState<string>("");
+  const [adminTab, setAdminTab] = useState("postRole");
+  const [adminCompanyId, setAdminCompanyId] = useState("");
   const [postRoleForm, setPostRoleForm] = useState({
     company_id: "",
     job_description: "",
@@ -132,12 +81,12 @@ export default function Home() {
     hours_per_week: "",
   });
   const [postSubmitting, setPostSubmitting] = useState(false);
-  const [companyApps, setCompanyApps] = useState<CompanyApplication[]>([]);
+  const [companyApps, setCompanyApps] = useState([]);
   const [companyAppsLoading, setCompanyAppsLoading] = useState(false);
-  const [companyAppsError, setCompanyAppsError] = useState<string | null>(null);
+  const [companyAppsError, setCompanyAppsError] = useState(null);
 
-  const [userProfile, setUserProfile] = useState<{ user_id: number; name: string; email: string; type: string } | null>(null);
-  const [companyProfile, setCompanyProfile] = useState<{ company_id: number; name: string; location: string | null; linkedin_url: string | null } | null>(null);
+  const [userProfile, setUserProfile] = useState(null);
+  const [companyProfile, setCompanyProfile] = useState(null);
 
   useEffect(() => {
     setIsHydrated(true);
@@ -146,7 +95,7 @@ export default function Home() {
       if (t) {
         setToken(t);
         try {
-          const decoded: any = jwtDecode(t);
+          const decoded = jwtDecode(t);
           if (decoded?.role === "company" || decoded?.role === "user") {
             setRole(decoded.role);
             if (decoded.role === "company") setActiveTab("admin");
@@ -162,11 +111,7 @@ export default function Home() {
     // fetch user profile
     (async () => {
       try {
-        const p = await apiFetch<{ user_id: number; name: string; email: string; type: string }>(
-          "/auth/me",
-          {},
-          true
-        );
+        const p = await apiFetch("/auth/me", {}, true);
         setUserProfile(p);
       } catch {}
     })();
@@ -176,28 +121,24 @@ export default function Home() {
     if (!token || role !== "company") return;
     (async () => {
       try {
-        const c = await apiFetch<{ company_id: number; name: string; location: string | null; linkedin_url: string | null }>(
-          "/api/companies/me",
-          {},
-          true
-        );
+        const c = await apiFetch("/api/companies/me", {}, true);
         setCompanyProfile(c);
       } catch {}
     })();
   }, [token, role]);
 
-  async function apiFetch<T>(path: string, init: RequestInit = {}, auth = false) {
-    const headers: Record<string, string> = {
+  async function apiFetch(path, init = {}, auth = false) {
+    const headers = {
       "Content-Type": "application/json",
-      ...(init.headers as Record<string, string> | undefined),
+      ...init.headers,
     };
     if (auth && token) headers["Authorization"] = `Bearer ${token}`;
     const res = await fetch(`${BACKEND_URL}${path}`, { ...init, headers });
     if (!res.ok) throw new Error(await res.text());
-    return (await res.json()) as T;
+    return await res.json();
   }
 
-  function showToast(message: string) {
+  function showToast(message) {
     setToast(message);
     setTimeout(() => setToast(null), 2600);
   }
@@ -207,9 +148,9 @@ export default function Home() {
       setRolesLoading(true);
       setRolesError(null);
       try {
-        const data = await apiFetch<Role[]>("/api/roles");
+        const data = await apiFetch("/api/roles");
         setRoles(data);
-      } catch (e: unknown) {
+      } catch (e) {
         setRolesError(String(e));
       } finally {
         setRolesLoading(false);
@@ -223,9 +164,9 @@ export default function Home() {
       setCompaniesLoading(true);
       setCompaniesError(null);
       try {
-        const data = await apiFetch<Company[]>("/api/companies");
+        const data = await apiFetch("/api/companies");
         setCompanies(data);
-      } catch (e: unknown) {
+      } catch (e) {
         setCompaniesError(String(e));
       } finally {
         setCompaniesLoading(false);
@@ -243,9 +184,9 @@ export default function Home() {
       setResumesLoading(true);
       setResumesError(null);
       try {
-        const data = await apiFetch<Resume[]>("/api/resumes", {}, true);
+        const data = await apiFetch("/api/resumes", {}, true);
         setResumes(data);
-      } catch (e: unknown) {
+      } catch (e) {
         setResumesError(String(e));
       } finally {
         setResumesLoading(false);
@@ -263,9 +204,9 @@ export default function Home() {
       setApplicationsLoading(true);
       setApplicationsError(null);
       try {
-        const data = await apiFetch<Application[]>("/api/applications", {}, true);
+        const data = await apiFetch("/api/applications", {}, true);
         setApplications(data);
-      } catch (e: unknown) {
+      } catch (e) {
         setApplicationsError(String(e));
       } finally {
         setApplicationsLoading(false);
@@ -275,7 +216,7 @@ export default function Home() {
   }, [token, role]);
 
   const uniqueCompanyNames = useMemo(() => {
-    const set = new Set<string>();
+    const set = new Set();
     for (const r of roles) {
       if (r.company_name) set.add(r.company_name);
     }
@@ -285,32 +226,39 @@ export default function Home() {
   const filteredRoles = useMemo(() => {
     const q = roleSearch.toLowerCase();
     return roles.filter((r) => {
-      const matchText = `${r.company_name} ${r.location ?? ""} ${r.pay ?? ""} ${r.job_description}`.toLowerCase();
+      const matchText = `${r.company_name} ${r.location ?? ""} ${r.pay ?? ""} ${
+        r.job_description
+      }`.toLowerCase();
       const passSearch = q.length === 0 || matchText.includes(q);
-      const passCompany = roleCompanyFilter ? r.company_name === roleCompanyFilter : true;
+      const passCompany = roleCompanyFilter
+        ? r.company_name === roleCompanyFilter
+        : true;
       return passSearch && passCompany;
     });
   }, [roles, roleSearch, roleCompanyFilter]);
 
-  async function handleLoginViaBackend(user: { name: string; email: string }, as: "user" | "company") {
+  async function handleLoginViaBackend(user, as) {
     try {
-      const res = await fetch(`${BACKEND_URL}/auth/${as === "company" ? "login-company" : "login"}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(user),
-      }).then((r) => r.json());
-      const receivedToken: string | undefined = res.token || res.authToken;
+      const res = await fetch(
+        `${BACKEND_URL}/auth/${as === "company" ? "login-company" : "login"}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(user),
+        }
+      ).then((r) => r.json());
+      const receivedToken = res.token || res.authToken;
       if (!receivedToken) throw new Error("No token returned");
       setToken(receivedToken);
       try {
         localStorage.setItem("token", receivedToken);
         cookies.set("authToken", receivedToken);
-        const decoded: any = jwtDecode(receivedToken);
+        const decoded = jwtDecode(receivedToken);
         setRole(decoded?.role === "company" ? "company" : "user");
       } catch {}
       showToast("Signed in");
       setActiveTab(as === "company" ? "admin" : "roles");
-    } catch (e: unknown) {
+    } catch (e) {
       showToast("Login failed");
     }
   }
@@ -325,30 +273,45 @@ export default function Home() {
     showToast("Signed out");
   }
 
-  async function handleAddResume(e: React.FormEvent<HTMLFormElement>) {
+  async function handleAddResume(e) {
     e.preventDefault();
     if (!token) return showToast("Sign in first");
-    if (!newResumeUrl.trim()) return showToast("Enter resume URL");
+    if (!newResumeFile) return showToast("upload a resume");
+
     try {
-      await apiFetch<Resume>(
-        "/api/resumes",
-        {
-          method: "POST",
-          body: JSON.stringify({ resume_url: newResumeUrl.trim(), resume_name: newResumeName.trim() || "Resume" }),
-        },
-        true
-      );
-      setNewResumeUrl("");
-      setNewResumeName("");
-      const data = await apiFetch<Resume[]>("/api/resumes", {}, true);
-      setResumes(data);
-      showToast("Resume added");
-    } catch (e: unknown) {
+      const fileUUID = crypto.randomUUID().slice(0, 8);
+      console.log(fileUUID);
+
+      const res = await supabaseFileUpload(`${fileUUID}.pdf`, newResumeFile);
+
+      if (res.error) {
+        console.error(error);
+      } else {
+        const resume_url = res.url;
+        await apiFetch(
+          "/api/resumes",
+          {
+            method: "POST",
+            body: JSON.stringify({
+              resume_url: resume_url,
+              resume_name: newResumeName.trim() || "Resume",
+            }),
+          },
+          true
+        );
+        setNewResumeFile("");
+        setNewResumeName("");
+        const data = await apiFetch("/api/resumes", {}, true);
+        setResumes(data);
+        showToast("Resume added");
+      }
+    } catch (e) {
+      console.log(e);
       showToast("Failed to add resume");
     }
   }
 
-  function openApply(role: Role) {
+  function openApply(role) {
     if (rolePropIsCompany()) return; // company should not apply
     setApplyRole(role);
     setSelectedResumeId(resumes[0]?.resume_id ?? null);
@@ -368,7 +331,10 @@ export default function Home() {
         "/api/applications",
         {
           method: "POST",
-          body: JSON.stringify({ role_id: applyRole.role_id, resume_id: selectedResumeId }),
+          body: JSON.stringify({
+            role_id: applyRole.role_id,
+            resume_id: selectedResumeId,
+          }),
         },
         true
       );
@@ -377,10 +343,10 @@ export default function Home() {
       setApplyRole(null);
       setSelectedResumeId(null);
       try {
-        const data = await apiFetch<Application[]>("/api/applications", {}, true);
+        const data = await apiFetch("/api/applications", {}, true);
         setApplications(data);
       } catch {}
-    } catch (e: unknown) {
+    } catch (e) {
       showToast("Failed to apply");
     } finally {
       setApplySubmitting(false);
@@ -399,10 +365,17 @@ export default function Home() {
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2">
               <div className="h-7 w-7 rounded-lg bg-gradient-to-tr from-blue-500 via-fuchsia-500 to-emerald-400 shadow-[0_0_32px_rgba(59,130,246,0.6)]" />
-              <span className="text-lg font-semibold tracking-tight text-white/90">Interview Portal</span>
+              <span className="text-lg font-semibold tracking-tight text-white/90">
+                Interview Portal
+              </span>
             </div>
             <div className="flex items-center gap-2">
-              <a href="/profile" className="rounded-md border border-white/10 bg-white/5 px-3 py-1.5 text-sm text-white/80 hover:bg-white/10 transition">Profile</a>
+              <a
+                href="/profile"
+                className="rounded-md border border-white/10 bg-white/5 px-3 py-1.5 text-sm text-white/80 hover:bg-white/10 transition"
+              >
+                Profile
+              </a>
               {isHydrated && token ? (
                 <button
                   onClick={handleLogout}
@@ -420,7 +393,9 @@ export default function Home() {
         <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
-              <span className="bg-gradient-to-r from-blue-400 via-fuchsia-400 to-emerald-400 bg-clip-text text-transparent">Careers Hub</span>
+              <span className="bg-gradient-to-r from-blue-400 via-fuchsia-400 to-emerald-400 bg-clip-text text-transparent">
+                Careers Hub
+              </span>
             </h1>
             <p className="mt-1 text-sm text-white/60">
               Browse roles, manage resumes, and track applications in one place.
@@ -429,7 +404,7 @@ export default function Home() {
           {!token ? (
             <div className="w-full sm:w-auto">
               <div className="mb-2 flex gap-2">
-                {(["user", "company"] as const).map((m) => (
+                {["user", "company"].map((m) => (
                   <button
                     key={m}
                     onClick={() => setAuthMode(m)}
@@ -452,12 +427,12 @@ export default function Home() {
                   <GoogleLogin
                     onSuccess={(credentialResponse) => {
                       try {
-                        const decoded: any = jwtDecode(
+                        const decoded = jwtDecode(
                           String(credentialResponse.credential || "")
                         );
                         const user = {
-                          email: decoded.email as string,
-                          name: (decoded.name as string) || (decoded.given_name as string) || "User",
+                          email: decoded.email,
+                          name: decoded.name || decoded.given_name || "User",
                         };
                         void handleLoginViaBackend(user, authMode);
                       } catch (err) {
@@ -475,7 +450,7 @@ export default function Home() {
           ) : (
             <div className="flex items-center gap-2 text-sm text-white/70">
               <span className="inline-flex h-2 w-2 rounded-full bg-emerald-400" />
-              Authenticated
+              {userProfile?.name}
             </div>
           )}
         </div>
@@ -496,14 +471,54 @@ export default function Home() {
           )}
           {role !== "company" && (
             <>
-              <button onClick={() => setActiveTab("roles")} className={cx("rounded-full border px-4 py-1.5 text-sm transition", activeTab === "roles" ? "border-transparent bg-white/15 text-white shadow-[0_0_24px_rgba(255,255,255,0.15)]" : "border-white/10 bg-white/5 text-white/70 hover:bg-white/10")}>Explore Roles</button>
-              <button onClick={() => setActiveTab("companies")} className={cx("rounded-full border px-4 py-1.5 text-sm transition", activeTab === "companies" ? "border-transparent bg-white/15 text-white shadow-[0_0_24px_rgba(255,255,255,0.15)]" : "border-white/10 bg-white/5 text-white/70 hover:bg-white/10")}>Companies</button>
+              <button
+                onClick={() => setActiveTab("roles")}
+                className={cx(
+                  "rounded-full border px-4 py-1.5 text-sm transition",
+                  activeTab === "roles"
+                    ? "border-transparent bg-white/15 text-white shadow-[0_0_24px_rgba(255,255,255,0.15)]"
+                    : "border-white/10 bg-white/5 text-white/70 hover:bg-white/10"
+                )}
+              >
+                Explore Roles
+              </button>
+              <button
+                onClick={() => setActiveTab("companies")}
+                className={cx(
+                  "rounded-full border px-4 py-1.5 text-sm transition",
+                  activeTab === "companies"
+                    ? "border-transparent bg-white/15 text-white shadow-[0_0_24px_rgba(255,255,255,0.15)]"
+                    : "border-white/10 bg-white/5 text-white/70 hover:bg-white/10"
+                )}
+              >
+                Companies
+              </button>
             </>
           )}
           {role !== "company" && (
             <>
-              <button onClick={() => setActiveTab("resumes")} className={cx("rounded-full border px-4 py-1.5 text-sm transition", activeTab === "resumes" ? "border-transparent bg-white/15 text-white shadow-[0_0_24px_rgba(255,255,255,0.15)]" : "border-white/10 bg-white/5 text-white/70 hover:bg-white/10")}>Resumes</button>
-              <button onClick={() => setActiveTab("applications")} className={cx("rounded-full border px-4 py-1.5 text-sm transition", activeTab === "applications" ? "border-transparent bg-white/15 text-white shadow-[0_0_24px_rgba(255,255,255,0.15)]" : "border-white/10 bg-white/5 text-white/70 hover:bg-white/10")}>Applications</button>
+              <button
+                onClick={() => setActiveTab("resumes")}
+                className={cx(
+                  "rounded-full border px-4 py-1.5 text-sm transition",
+                  activeTab === "resumes"
+                    ? "border-transparent bg-white/15 text-white shadow-[0_0_24px_rgba(255,255,255,0.15)]"
+                    : "border-white/10 bg-white/5 text-white/70 hover:bg-white/10"
+                )}
+              >
+                Resumes
+              </button>
+              <button
+                onClick={() => setActiveTab("applications")}
+                className={cx(
+                  "rounded-full border px-4 py-1.5 text-sm transition",
+                  activeTab === "applications"
+                    ? "border-transparent bg-white/15 text-white shadow-[0_0_24px_rgba(255,255,255,0.15)]"
+                    : "border-white/10 bg-white/5 text-white/70 hover:bg-white/10"
+                )}
+              >
+                Applications
+              </button>
             </>
           )}
         </nav>
@@ -578,7 +593,10 @@ export default function Home() {
 
         {activeTab === "companies" ? (
           <section>
-            <SectionHeader title="Companies" subtitle="Discover employers and their locations." />
+            <SectionHeader
+              title="Companies"
+              subtitle="Discover employers and their locations."
+            />
             {companiesLoading ? (
               <div className="text-white/70">Loading companies…</div>
             ) : companiesError ? (
@@ -591,14 +609,16 @@ export default function Home() {
                   <a
                     key={c.company_id}
                     href={c.linkedin_url || "#"}
-            target="_blank"
+                    target="_blank"
                     rel="noreferrer"
                     className="relative overflow-hidden rounded-xl border border-white/10 bg-white/5 p-4 transition hover:border-white/20 hover:bg-white/10"
                   >
                     <div className="mb-1 text-base font-medium text-white/90">
                       {c.name}
                     </div>
-                    <div className="text-sm text-white/60">{c.location || "—"}</div>
+                    <div className="text-sm text-white/60">
+                      {c.location || "—"}
+                    </div>
                   </a>
                 ))}
               </div>
@@ -610,24 +630,31 @@ export default function Home() {
           <section>
             <SectionHeader
               title="Resumes"
-              subtitle={token ? "Manage your resume URLs." : "Sign in to manage your resumes."}
+              subtitle={
+                token
+                  ? "Manage your resume URLs."
+                  : "Sign in to manage your resumes."
+              }
             />
             {!token ? (
               <div className="text-white/60">Authentication required.</div>
             ) : (
               <>
-                <form onSubmit={handleAddResume} className="mb-4 flex flex-col gap-2 sm:flex-row">
+                <form
+                  onSubmit={handleAddResume}
+                  className="mb-4 flex flex-col gap-2 sm:flex-row"
+                >
                   <input
+                    type="file"
                     placeholder="https://..."
-                    value={newResumeUrl}
-                    onChange={(e) => setNewResumeUrl(e.target.value)}
-                    className="flex-1 rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm outline-none placeholder:text-white/40 focus:ring-2 focus:ring-emerald-500/60"
+                    onChange={(e) => setNewResumeFile(e.target.files[0])}
+                    className="rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm outline-none placeholder:text-white/40 focus:ring-2 focus:ring-emerald-500/60"
                   />
                   <input
                     placeholder="Resume name"
                     value={newResumeName}
                     onChange={(e) => setNewResumeName(e.target.value)}
-                    className="rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm outline-none placeholder:text-white/40 focus:ring-2 focus:ring-emerald-500/60"
+                    className="flex-1 rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm outline-none placeholder:text-white/40 focus:ring-2 focus:ring-emerald-500/60"
                   />
                   <button
                     type="submit"
@@ -645,14 +672,22 @@ export default function Home() {
                 ) : (
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     {resumes.map((r) => (
-                      <div key={r.resume_id} className="rounded-lg border border-white/10 bg-white/5 p-3">
+                      <div
+                        key={r.resume_id}
+                        className="rounded-lg border border-white/10 bg-white/5 p-3"
+                      >
                         <div className="mb-1 text-sm font-medium text-white/90">
                           {r.resume_name || "Resume"} #{r.resume_id}
                         </div>
-                        <a href={r.resume_url} target="_blank" rel="noreferrer" className="truncate text-xs text-blue-300 hover:underline">
+                        <a
+                          href={r.resume_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="truncate text-xs text-blue-300 hover:underline"
+                        >
                           {r.resume_url}
-          </a>
-        </div>
+                        </a>
+                      </div>
                     ))}
                   </div>
                 )}
@@ -665,7 +700,11 @@ export default function Home() {
           <section>
             <SectionHeader
               title="Applications"
-              subtitle={token ? "Track your application statuses." : "Sign in to view applications."}
+              subtitle={
+                token
+                  ? "Track your application statuses."
+                  : "Sign in to view applications."
+              }
             />
             {!token ? (
               <div className="text-white/60">Authentication required.</div>
@@ -678,7 +717,10 @@ export default function Home() {
             ) : (
               <div className="space-y-3">
                 {applications.map((a) => (
-                  <div key={a.application_id} className="rounded-lg border border-white/10 bg-white/5 p-4">
+                  <div
+                    key={a.application_id}
+                    className="rounded-lg border border-white/10 bg-white/5 p-4"
+                  >
                     <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
                       <div className="text-sm font-medium text-white/90">
                         {a.company_name}
@@ -687,16 +729,22 @@ export default function Home() {
                         className={cx(
                           "rounded-full px-2.5 py-1 text-xs",
                           a.status === "applied" && "bg-white/10 text-white/80",
-                          a.status === "reviewing" && "bg-blue-500/20 text-blue-200",
-                          a.status === "interviewing" && "bg-amber-500/20 text-amber-200",
-                          a.status === "rejected" && "bg-rose-500/20 text-rose-200",
-                          a.status === "hired" && "bg-emerald-500/20 text-emerald-200"
+                          a.status === "reviewing" &&
+                            "bg-blue-500/20 text-blue-200",
+                          a.status === "interviewing" &&
+                            "bg-amber-500/20 text-amber-200",
+                          a.status === "rejected" &&
+                            "bg-rose-500/20 text-rose-200",
+                          a.status === "hired" &&
+                            "bg-emerald-500/20 text-emerald-200"
                         )}
                       >
                         {a.status}
                       </div>
                     </div>
-                    <div className="text-sm text-white/70 line-clamp-2">{a.job_description}</div>
+                    <div className="text-sm text-white/70 line-clamp-2">
+                      {a.job_description}
+                    </div>
                     <div className="mt-2 text-xs text-white/50">
                       {new Date(a.created_at).toLocaleString()}
                     </div>
@@ -711,14 +759,18 @@ export default function Home() {
           <section>
             <SectionHeader
               title="Company Admin"
-              subtitle={token ? "Post roles and review applications for your company." : "Sign in to manage roles and applications."}
+              subtitle={
+                token
+                  ? "Post roles and review applications for your company."
+                  : "Sign in to manage roles and applications."
+              }
             />
             {!token ? (
               <div className="text-white/60">Authentication required.</div>
             ) : (
               <div className="rounded-xl border border-white/10 bg-white/5 p-4">
                 <div className="mb-3 flex gap-2">
-                  {(["postRole", "reviewApps"] as const).map((t) => (
+                  {["postRole", "reviewApps"].map((t) => (
                     <button
                       key={t}
                       onClick={() => setAdminTab(t)}
@@ -753,8 +805,11 @@ export default function Home() {
                               pay: postRoleForm.pay || null,
                               location: postRoleForm.location || null,
                               start_date: postRoleForm.start_date || null,
-                              application_end_date: postRoleForm.application_end_date || null,
-                              hours_per_week: postRoleForm.hours_per_week ? Number(postRoleForm.hours_per_week) : null,
+                              application_end_date:
+                                postRoleForm.application_end_date || null,
+                              hours_per_week: postRoleForm.hours_per_week
+                                ? Number(postRoleForm.hours_per_week)
+                                : null,
                             }),
                           },
                           true
@@ -781,40 +836,70 @@ export default function Home() {
                     <input
                       placeholder="Location"
                       value={postRoleForm.location}
-                      onChange={(e) => setPostRoleForm({ ...postRoleForm, location: e.target.value })}
+                      onChange={(e) =>
+                        setPostRoleForm({
+                          ...postRoleForm,
+                          location: e.target.value,
+                        })
+                      }
                       className="rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm outline-none"
                     />
                     <input
                       placeholder="Pay (e.g. $120k-$150k)"
                       value={postRoleForm.pay}
-                      onChange={(e) => setPostRoleForm({ ...postRoleForm, pay: e.target.value })}
+                      onChange={(e) =>
+                        setPostRoleForm({
+                          ...postRoleForm,
+                          pay: e.target.value,
+                        })
+                      }
                       className="rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm outline-none"
                     />
                     <input
                       type="date"
                       placeholder="Start date"
                       value={postRoleForm.start_date}
-                      onChange={(e) => setPostRoleForm({ ...postRoleForm, start_date: e.target.value })}
+                      onChange={(e) =>
+                        setPostRoleForm({
+                          ...postRoleForm,
+                          start_date: e.target.value,
+                        })
+                      }
                       className="rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm outline-none"
                     />
                     <input
                       type="date"
                       placeholder="Application end date"
                       value={postRoleForm.application_end_date}
-                      onChange={(e) => setPostRoleForm({ ...postRoleForm, application_end_date: e.target.value })}
+                      onChange={(e) =>
+                        setPostRoleForm({
+                          ...postRoleForm,
+                          application_end_date: e.target.value,
+                        })
+                      }
                       className="rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm outline-none"
                     />
                     <input
                       type="number"
                       placeholder="Hours per week"
                       value={postRoleForm.hours_per_week}
-                      onChange={(e) => setPostRoleForm({ ...postRoleForm, hours_per_week: e.target.value })}
+                      onChange={(e) =>
+                        setPostRoleForm({
+                          ...postRoleForm,
+                          hours_per_week: e.target.value,
+                        })
+                      }
                       className="rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm outline-none"
                     />
                     <textarea
                       placeholder="Job description"
                       value={postRoleForm.job_description}
-                      onChange={(e) => setPostRoleForm({ ...postRoleForm, job_description: e.target.value })}
+                      onChange={(e) =>
+                        setPostRoleForm({
+                          ...postRoleForm,
+                          job_description: e.target.value,
+                        })
+                      }
                       className="sm:col-span-2 h-28 rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm outline-none"
                     />
                     <div className="sm:col-span-2 flex justify-end">
@@ -840,8 +925,10 @@ export default function Home() {
                           setCompanyAppsLoading(true);
                           setCompanyAppsError(null);
                           try {
-                            const data = await apiFetch<CompanyApplication[]>(
-                              `/api/applications/company/${(jwtDecode(token!) as any).company_id}`,
+                            const data = await apiFetch(
+                              `/api/applications/company/${
+                                jwtDecode(token).company_id
+                              }`,
                               {},
                               true
                             );
@@ -869,19 +956,29 @@ export default function Home() {
                     ) : (
                       <div className="space-y-3">
                         {companyApps.map((a) => (
-                          <div key={a.application_id} className="rounded-lg border border-white/10 bg-white/5 p-3">
+                          <div
+                            key={a.application_id}
+                            className="rounded-lg border border-white/10 bg-white/5 p-3"
+                          >
                             <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
                               <div className="text-sm font-medium text-white/90">
-                                {a.user_name} <span className="text-white/50">({a.user_email})</span>
+                                {a.user_name}{" "}
+                                <span className="text-white/50">
+                                  ({a.user_email})
+                                </span>
                               </div>
-                              <div className="text-xs text-white/60">{new Date(a.created_at).toLocaleString()}</div>
+                              <div className="text-xs text-white/60">
+                                {new Date(a.created_at).toLocaleString()}
+                              </div>
                             </div>
-                            <div className="mb-2 text-sm text-white/70 line-clamp-2">{a.job_description}</div>
+                            <div className="mb-2 text-sm text-white/70 line-clamp-2">
+                              {a.job_description}
+                            </div>
                             <div className="flex items-center gap-2">
                               <select
                                 value={a.status}
                                 onChange={async (e) => {
-                                  const next = e.target.value as CompanyApplication["status"];
+                                  const next = e.target.value;
                                   try {
                                     await apiFetch(
                                       `/api/applications/${a.application_id}/status`,
@@ -891,23 +988,33 @@ export default function Home() {
                                       },
                                       true
                                     );
-                                    setCompanyApps((prev) => prev.map((x) => (x.application_id === a.application_id ? { ...x, status: next } : x)));
+                                    setCompanyApps((prev) =>
+                                      prev.map((x) =>
+                                        x.application_id === a.application_id
+                                          ? { ...x, status: next }
+                                          : x
+                                      )
+                                    );
                                   } catch (err) {
                                     showToast("Failed to update status");
                                   }
                                 }}
                                 className="rounded-md border border-white/10 bg-white/5 px-2 py-1 text-xs"
                               >
-                                {["applied", "reviewing", "interviewing", "rejected", "hired"].map((s) => (
-                                  <option key={s} value={s}>{s}</option>
+                                {[
+                                  "applied",
+                                  "reviewing",
+                                  "interviewing",
+                                  "rejected",
+                                  "hired",
+                                ].map((s) => (
+                                  <option key={s} value={s}>
+                                    {s}
+                                  </option>
                                 ))}
                               </select>
                               <a
-                                href="#"
-                                onClick={(ev) => {
-                                  ev.preventDefault();
-                                  window.open(`/api/resume/${a.resume_id}`, "_blank");
-                                }}
+                                href={a.resume_url}
                                 className="text-xs text-blue-300 hover:underline"
                               >
                                 View resume #{a.resume_id}
@@ -928,7 +1035,9 @@ export default function Home() {
       {applyOpen ? (
         <div className="fixed inset-0 z-30 flex items-center justify-center bg-black/70 p-4">
           <div className="w-full max-w-md rounded-xl border border-white/10 bg-black/80 p-5 shadow-[0_0_60px_rgba(59,130,246,0.25)]">
-            <div className="mb-4 text-base font-semibold text-white/90">Apply to {applyRole?.company_name}</div>
+            <div className="mb-4 text-base font-semibold text-white/90">
+              Apply to {applyRole?.company_name}
+            </div>
             {!token ? (
               <div className="text-white/70">Sign in to apply.</div>
             ) : resumesLoading ? (
@@ -937,7 +1046,9 @@ export default function Home() {
               <div className="text-white/70">Add a resume first.</div>
             ) : (
               <div className="space-y-3">
-                <label className="block text-sm text-white/80">Choose resume</label>
+                <label className="block text-sm text-white/80">
+                  Choose resume
+                </label>
                 <select
                   value={selectedResumeId ?? undefined}
                   onChange={(e) => setSelectedResumeId(Number(e.target.value))}
@@ -945,7 +1056,7 @@ export default function Home() {
                 >
                   {resumes.map((r) => (
                     <option key={r.resume_id} value={r.resume_id}>
-                      {(r.resume_name || "Resume")} #{r.resume_id}
+                      {r.resume_name || "Resume"} #{r.resume_id}
                     </option>
                   ))}
                 </select>

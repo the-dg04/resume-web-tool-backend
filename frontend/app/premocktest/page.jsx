@@ -43,41 +43,49 @@ const dummyData = {
     status: "success",
   };
 
+// --- Helper Objects for New Inputs ---
+const difficultyLevels = ["novice", "intermediate", "actual", "challenge"];
+const difficultyDescriptions = {
+  novice:
+    "Focuses on fundamental concepts and basic syntax. Ideal for beginners.",
+  intermediate:
+    "Covers a broader range of topics with more complex problems. Suitable for those with some experience.",
+  actual:
+    "Simulates a real interview scenario with questions matching the job description's expected skill level.",
+  challenge:
+    "Presents difficult problems and advanced concepts to push your knowledge to its limits.",
+};
+
 // --- Main Page Component ---
 
 export default function TestSetupPage() {
   // --- State Management ---
   const [resumes, setResumes] = useState([]);
-  const [selectedResume, setSelectedResume] = useState(
-    resumes[0]?.resume_id || ""
-  );
+  const [selectedResume, setSelectedResume] = useState("");
   const [token, setToken] = useState("");
   const [jobDescription, setJobDescription] = useState("");
+  const [difficulty, setDifficulty] = useState("actual");
+  const [duration, setDuration] = useState("30");
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
     try {
       const t = localStorage.getItem("token");
-      console.log(t);
       if (t) {
         setToken(t);
         const decoded = jwtDecode(t);
         if (decoded?.role !== "user") router.push("/403");
       }
     } catch (err) {
-      //   router.push("/");
       console.log(err);
+      // router.push("/");
     }
   }, []);
 
   // --- Handlers ---
   const handleStartTest = (e) => {
     e.preventDefault();
-    console.log({
-        resumeId: selectedResume,
-        jobDescription: jobDescription,
-      });
     if (!selectedResume || !jobDescription.trim()) {
       alert("Please select a resume and enter a job description.");
       return;
@@ -88,38 +96,40 @@ export default function TestSetupPage() {
     console.log({
       resumeId: selectedResume,
       jobDescription: jobDescription,
+      difficulty: difficulty,
+      duration: `${duration} min`,
     });
 
     // Simulate an API call or processing delay
     setTimeout(() => {
       setIsLoading(false);
-      //   alert("Test started! (Check the console for details)");
-      // In a real application, you would navigate to the test page here.
-      // For example: window.location.href = '/mock-test';
-
-      // generate test
-      // set questions in localstorage
-      localStorage.setItem("mocktest_questions",JSON.stringify(dummyData))
-      localStorage.setItem("mocktest_started",false)
-
+      localStorage.setItem("mocktest_questions", JSON.stringify(dummyData));
+      localStorage.setItem("mocktest_started", "false");
       router.push("/mocktest");
     }, 1500);
   };
 
+  const handleDifficultyChange = (e) => {
+    setDifficulty(difficultyLevels[e.target.value]);
+  };
+
   useEffect(() => {
-    if (token !== "") {
+    if (token) {
       (async () => {
-        const res = await fetch(`${BACKEND_URL}/api/resumes`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-
-        const resJSON = await res.json();
-        console.log(resJSON);
-
-        setResumes(resJSON);
-        setSelectedResume(resJSON[0]?.resume_id)
+        try {
+          const res = await fetch(`${BACKEND_URL}/api/resumes`, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          });
+          const resJSON = await res.json();
+          if (resJSON && resJSON.length > 0) {
+            setResumes(resJSON);
+            setSelectedResume(resJSON[0]?.resume_id);
+          }
+        } catch (error) {
+          console.error("Failed to fetch resumes:", error);
+        }
       })();
     }
   }, [token]);
@@ -149,18 +159,25 @@ export default function TestSetupPage() {
               <select
                 id="resume-select"
                 value={selectedResume}
-                onChange={(e) => {setSelectedResume(e.target.value);console.log(e.target.value);}}
+                onChange={(e) => setSelectedResume(e.target.value)}
                 className="w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/90 outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                disabled={!resumes.length}
               >
-                {resumes.map((resume) => (
-                  <option
-                    key={resume.resume_id}
-                    value={resume.resume_id}
-                    className="bg-gray-800 text-white"
-                  >
-                    {resume.resume_name}
+                 {resumes.length > 0 ? (
+                  resumes.map((resume) => (
+                    <option
+                      key={resume.resume_id}
+                      value={resume.resume_id}
+                      className="bg-gray-800 text-white"
+                    >
+                      {resume.resume_name}
+                    </option>
+                  ))
+                ) : (
+                  <option value="" disabled className="bg-gray-800 text-white/50">
+                    No resumes found
                   </option>
-                ))}
+                )}
               </select>
             </div>
 
@@ -180,6 +197,73 @@ export default function TestSetupPage() {
                 rows={8}
                 className="w-full rounded-md border border-white/10 bg-white/5 p-3 text-sm text-white/80 outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all resize-y"
               />
+            </div>
+
+            {/* Difficulty Slider */}
+            <div>
+              <label
+                htmlFor="difficulty-slider"
+                className="block text-sm font-medium text-white/70 mb-2"
+              >
+                Difficulty: <span className="font-bold capitalize">{difficulty}</span>
+              </label>
+              <div className="relative pt-1">
+                <input
+                  type="range"
+                  id="difficulty-slider"
+                  min="0"
+                  max="3"
+                  value={difficultyLevels.indexOf(difficulty)}
+                  onChange={handleDifficultyChange}
+                  className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                />
+                {/* Checkpoints */}
+                <div className="w-full flex justify-between text-xs text-white/40 px-1 mt-2">
+                  {difficultyLevels.map((level) => (
+                    <span key={level} className="capitalize">{level}</span>
+                  ))}
+                </div>
+              </div>
+              <p className="text-xs text-white/50 italic mt-2 h-8">
+                {difficultyDescriptions[difficulty]}
+              </p>
+            </div>
+
+            {/* Duration Radio Buttons */}
+            <div>
+              <label className="block text-sm font-medium text-white/70 mb-2">
+                Duration
+              </label>
+              <div className="flex items-center space-x-4">
+                <div className="flex items-center">
+                  <input
+                    id="duration-30"
+                    name="duration"
+                    type="radio"
+                    value="30"
+                    checked={duration === "30"}
+                    onChange={(e) => setDuration(e.target.value)}
+                    className="h-4 w-4 text-blue-600 bg-gray-700 border-gray-600 focus:ring-blue-500"
+                  />
+                  <label htmlFor="duration-30" className="ml-2 block text-sm text-white/90">
+                    30 minutes
+                  </label>
+                </div>
+                <div className="flex items-center">
+                  <input
+                    id="duration-60"
+                    name="duration"
+                    type="radio"
+                    value="60"
+                    checked={duration === "60"}
+                    onChange={(e) => setDuration(e.target.value)}
+                    className="h-4 w-4 text-blue-600 bg-gray-700 border-gray-600 focus:ring-blue-500"
+                  />
+                  <label htmlFor="duration-60" className="ml-2 block text-sm text-white/90">
+                    60 minutes
+                  </label>
+                </div>
+              </div>
             </div>
 
             {/* Start Test Button */}
