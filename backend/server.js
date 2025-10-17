@@ -22,6 +22,19 @@ app.use(cors({
 app.use(express.json()); // To parse JSON bodies
 app.use(express.urlencoded({ extended: true }));
 
+// Middleware to enforce trailing slash
+app.use((req, res, next) => {
+  // Check if the request path does not end with a slash
+  // and is not the root path itself (to avoid an infinite redirect loop on root)
+  // We also check req.url to ensure it's not just a request for '/' already
+  if (req.path.substr(-1) !== '/' && req.url.length > 1) {
+    const query = req.url.slice(req.path.length); // Keep any query parameters
+    res.redirect(301, req.path + '/' + query);
+  } else {
+    next();
+  }
+});
+
 // --- Routes ---
 app.use('/auth', authRoutes);
 app.use('/api/companies', companiesRoutes);
