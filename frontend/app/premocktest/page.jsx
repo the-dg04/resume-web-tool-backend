@@ -5,43 +5,57 @@ import { useRouter } from "next/navigation";
 import { jwtDecode } from "jwt-decode";
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_API_BASE;
+const ML_BACKEND_URL = process.env.NEXT_PUBLIC_ML_API_BASE;
 
 const dummyData = {
-    tier: "freemium",
-    questions: {
-      open_questions: [
-        "Describe the concept of closures in JavaScript. Provide a simple code example.",
-        "What are the main differences between `let`, `const`, and `var` in JavaScript?",
-        "Explain the box model in CSS.",
-        "What is the purpose of the `useEffect` hook in React? Describe its dependency array.",
-      ],
-      mcq: [
-        {
-          question: "Which of the following is NOT a primitive data type in JavaScript?",
-          options: ["a. String", "b. Number", "c. Object", "d. Boolean", "e. Undefined"],
-        },
-        {
-          question: "What does CSS stand for?",
-          options: [
-            "a. Creative Style Sheets",
-            "b. Cascading Style Sheets",
-            "c. Computer Style Sheets",
-            "d. Colorful Style Sheets",
-          ],
-        },
-        {
-          question: "Which hook is used to manage state in a functional React component?",
-          options: ["a. useEffect", "b. useContext", "c. useState", "d. useReducer"],
-        },
-        {
-          question: "What HTTP status code represents a successful request?",
-          options: ["a. 200", "b. 404", "c. 500", "d. 301"],
-        },
-      ],
-    },
-    total_questions: 8,
-    status: "success",
-  };
+  tier: "freemium",
+  questions: {
+    open_questions: [
+      "Describe the concept of closures in JavaScript. Provide a simple code example.",
+      "What are the main differences between `let`, `const`, and `var` in JavaScript?",
+      "Explain the box model in CSS.",
+      "What is the purpose of the `useEffect` hook in React? Describe its dependency array.",
+    ],
+    mcq: [
+      {
+        question:
+          "Which of the following is NOT a primitive data type in JavaScript?",
+        options: [
+          "a. String",
+          "b. Number",
+          "c. Object",
+          "d. Boolean",
+          "e. Undefined",
+        ],
+      },
+      {
+        question: "What does CSS stand for?",
+        options: [
+          "a. Creative Style Sheets",
+          "b. Cascading Style Sheets",
+          "c. Computer Style Sheets",
+          "d. Colorful Style Sheets",
+        ],
+      },
+      {
+        question:
+          "Which hook is used to manage state in a functional React component?",
+        options: [
+          "a. useEffect",
+          "b. useContext",
+          "c. useState",
+          "d. useReducer",
+        ],
+      },
+      {
+        question: "What HTTP status code represents a successful request?",
+        options: ["a. 200", "b. 404", "c. 500", "d. 301"],
+      },
+    ],
+  },
+  total_questions: 8,
+  status: "success",
+};
 
 // --- Helper Objects for New Inputs ---
 const difficultyLevels = ["novice", "intermediate", "actual", "challenge"];
@@ -84,7 +98,7 @@ export default function TestSetupPage() {
   }, []);
 
   // --- Handlers ---
-  const handleStartTest = (e) => {
+  const handleStartTest = async (e) => {
     e.preventDefault();
     if (!selectedResume || !jobDescription.trim()) {
       alert("Please select a resume and enter a job description.");
@@ -100,13 +114,45 @@ export default function TestSetupPage() {
       duration: `${duration} min`,
     });
 
-    // Simulate an API call or processing delay
-    setTimeout(() => {
+    try {
+      let resumeId = -1;
+      resumes.forEach((val,idx)=>{
+        if(val.resume_id==selectedResume){
+          resumeId = idx
+        }
+      })
+      console.log("id : ",resumeId);
+      console.log("resumes : ",resumes);
+      console.log({
+        resume_url: resumes[resumeId].resume_url,
+        job_description: jobDescription,
+        difficulty: difficulty,
+        duration: duration,
+        tier: "free",
+      });
+      const res = await fetch(`${ML_BACKEND_URL}/generate-test/generate-test`, {
+        method: "POST",
+        headers: {
+          "Content-type": "Application/json",
+        },
+        body: JSON.stringify({
+          resume_url: resumes[resumeId].resume_url,
+          job_description: jobDescription,
+          difficulty: difficulty,
+          duration: duration,
+          tier: "free",
+        }),
+      });
+
+      const resJSON = await res.json();
+
       setIsLoading(false);
-      localStorage.setItem("mocktest_questions", JSON.stringify(dummyData));
+      localStorage.setItem("mocktest_questions", JSON.stringify(resJSON));
       localStorage.setItem("mocktest_started", "false");
       router.push("/mocktest");
-    }, 1500);
+    } catch (err) {
+      console.log(err);
+    }
   };
 
   const handleDifficultyChange = (e) => {
@@ -163,7 +209,7 @@ export default function TestSetupPage() {
                 className="w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/90 outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
                 disabled={!resumes.length}
               >
-                 {resumes.length > 0 ? (
+                {resumes.length > 0 ? (
                   resumes.map((resume) => (
                     <option
                       key={resume.resume_id}
@@ -174,7 +220,11 @@ export default function TestSetupPage() {
                     </option>
                   ))
                 ) : (
-                  <option value="" disabled className="bg-gray-800 text-white/50">
+                  <option
+                    value=""
+                    disabled
+                    className="bg-gray-800 text-white/50"
+                  >
                     No resumes found
                   </option>
                 )}
@@ -205,7 +255,8 @@ export default function TestSetupPage() {
                 htmlFor="difficulty-slider"
                 className="block text-sm font-medium text-white/70 mb-2"
               >
-                Difficulty: <span className="font-bold capitalize">{difficulty}</span>
+                Difficulty:{" "}
+                <span className="font-bold capitalize">{difficulty}</span>
               </label>
               <div className="relative pt-1">
                 <input
@@ -220,7 +271,9 @@ export default function TestSetupPage() {
                 {/* Checkpoints */}
                 <div className="w-full flex justify-between text-xs text-white/40 px-1 mt-2">
                   {difficultyLevels.map((level) => (
-                    <span key={level} className="capitalize">{level}</span>
+                    <span key={level} className="capitalize">
+                      {level}
+                    </span>
                   ))}
                 </div>
               </div>
@@ -245,7 +298,10 @@ export default function TestSetupPage() {
                     onChange={(e) => setDuration(e.target.value)}
                     className="h-4 w-4 text-blue-600 bg-gray-700 border-gray-600 focus:ring-blue-500"
                   />
-                  <label htmlFor="duration-30" className="ml-2 block text-sm text-white/90">
+                  <label
+                    htmlFor="duration-30"
+                    className="ml-2 block text-sm text-white/90"
+                  >
                     30 minutes
                   </label>
                 </div>
@@ -259,7 +315,10 @@ export default function TestSetupPage() {
                     onChange={(e) => setDuration(e.target.value)}
                     className="h-4 w-4 text-blue-600 bg-gray-700 border-gray-600 focus:ring-blue-500"
                   />
-                  <label htmlFor="duration-60" className="ml-2 block text-sm text-white/90">
+                  <label
+                    htmlFor="duration-60"
+                    className="ml-2 block text-sm text-white/90"
+                  >
                     60 minutes
                   </label>
                 </div>
