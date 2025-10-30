@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useCallback } from "react";
+import useAntiCheat from "../hooks/useAnticheat"; // Adjust path as needed
 
 // --- Helper Components ---
 
@@ -22,7 +23,7 @@ const QuestionNavItem = ({ index, isActive, isAnswered, onClick }) => (
 );
 
 // The countdown timer component
-const Timer = ({ timeLeft }) => {
+const Timer = ({ timeLeft, violationCount }) => {
   const minutes = Math.floor(timeLeft / 60)
     .toString()
     .padStart(2, "0");
@@ -30,15 +31,111 @@ const Timer = ({ timeLeft }) => {
   const isLowTime = timeLeft <= 300; // 5 minutes
 
   return (
-    <div
-      className={`px-4 py-2 rounded-lg text-lg font-mono tracking-wider ${
-        isLowTime ? "bg-red-500/20 text-red-300" : "bg-white/5 text-white/80"
-      }`}
-    >
-      {minutes}:{seconds}
+    <div className="flex items-center gap-4">
+      {/* Violation Counter */}
+      {violationCount > 0 && (
+        <div
+          className={`px-4 py-2 rounded-lg text-lg font-mono tracking-wider ${
+            violationCount >= 4 // Show red on 4th violation (one before auto-submit)
+              ? "bg-red-500/20 text-red-300"
+              : "bg-yellow-500/20 text-yellow-300"
+          }`}
+          title={`${violationCount} anti-cheat violation(s) detected`}
+        >
+          Violations: {violationCount} / 5
+        </div>
+      )}
+
+      {/* Timer */}
+      <div
+        className={`px-4 py-2 rounded-lg text-lg font-mono tracking-wider ${
+          isLowTime ? "bg-red-500/20 text-red-300" : "bg-white/5 text-white/80"
+        }`}
+      >
+        {minutes}:{seconds}
+      </div>
     </div>
   );
 };
+
+// --- Violation Modal Component ---
+const ViolationModal = ({ isOpen, onClose, violationType, violationCount }) => {
+  if (!isOpen) return null;
+
+  const violationMessages = {
+    tab_switch: "You switched tabs or minimized the window.",
+    copy: "Copying text is not allowed.",
+    paste: "Pasting text is not allowed.",
+    cut: "Cutting text is not allowed.",
+    right_click: "Right-clicking is not allowed.",
+  };
+
+  const message =
+    violationMessages[violationType] || "A violation was detected.";
+  const isFinalWarning = violationCount === 4;
+  const isAutoSubmit = violationCount >= 5;
+
+  return (
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex justify-center items-center p-4">
+      <div className="bg-gray-900 border border-red-500/50 rounded-lg shadow-xl p-6 w-full max-w-md text-center">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          className="h-16 w-16 text-red-500 mx-auto mb-4"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+          />
+        </svg>
+        <h2 className="text-2xl font-bold text-white mb-3">
+          {isAutoSubmit
+            ? "Test Auto-Submitted"
+            : isFinalWarning
+            ? "Final Warning!"
+            : "Violation Detected"}
+        </h2>
+        <p className="text-white/80 mb-2">{message}</p>
+        <p className="text-yellow-300 text-lg font-bold mb-6">
+          Violation Count: {violationCount} / 5
+        </p>
+        {!isAutoSubmit && (
+          <button
+            onClick={onClose}
+            className="w-full px-6 py-2 rounded-md bg-red-600 text-white font-bold hover:bg-red-500 transition-colors"
+          >
+            I Understand
+          </button>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// --- Start Test Overlay Component ---
+const StartTestOverlay = ({ onStart }) => (
+  <div className="min-h-screen bg-black text-white flex flex-col justify-center items-center text-center p-8">
+    <h1 className="text-4xl font-bold mb-4">Mock Test</h1>
+    <p className="text-white/70 text-lg max-w-xl mb-8">
+      This test will run in fullscreen mode. Any attempt to exit fullscreen,
+      switch tabs, copy, or paste will be flagged as a violation.
+      <br />
+      <strong className="text-yellow-300 mt-2 block">
+        5 violations will result in an automatic submission of your test.
+      </strong>
+    </p>
+    <button
+      onClick={onStart}
+      className="px-10 py-4 rounded-md bg-blue-600 text-white text-lg font-bold hover:bg-blue-500 transition-colors shadow-lg shadow-blue-600/20"
+    >
+      Start Test in Fullscreen
+    </button>
+  </div>
+);
 
 // --- Main Page Component ---
 
@@ -51,15 +148,20 @@ export default function MockTestPage() {
   const [allQuestions, setAllQuestions] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [isTestStarted, setIsTestStarted] = useState(false); // New state for start overlay
+  const [isViolationModalOpen, setIsViolationModalOpen] = useState(false); // New state for modal
+  const [lastViolationType, setLastViolationType] = useState(""); // New state for modal
   const router = useRouter();
 
   // --- Handlers ---
 
-  // FIX: Wrapped handleSubmit in useCallback for stability and to prevent unnecessary re-renders.
+  // Wrapped handleSubmit in useCallback
   const handleSubmit = useCallback(() => {
+    // Prevent multiple submissions
+    if (isSubmitted) return;
+    
     console.log("Submitting final answers:", answers);
 
-    // FIX: Clear all test-related data from localStorage upon successful submission.
     localStorage.removeItem("mocktest_questions");
     localStorage.removeItem("mocktest_answers");
     localStorage.removeItem("mocktest_endTime");
@@ -70,46 +172,74 @@ export default function MockTestPage() {
       JSON.stringify({
         questions: allQuestions,
         answers: answers,
-        testDuration: 30 * 60, // 
+        testDuration: 30 * 60,
         attemptDuration: 30 * 60 - timeLeft,
-        difficulty: "actual", // novice | intermediate | actual | challenge
+        difficulty: "actual",
       })
     );
 
-    setIsSubmitted(true); // Show submission confirmation screen
-    setTimeLeft(0); // Stop the timer
-  }, [answers]);
+    setIsSubmitted(true);
+    setTimeLeft(0);
+    // Exit fullscreen if user is still in it
+    if (document.fullscreenElement) {
+      document.exitFullscreen();
+    }
+  }, [answers, allQuestions, timeLeft, isSubmitted]);
+
+  // --- Anti-Cheat Hook ---
+  const handleViolation = useCallback(
+    (violationType, newCount) => {
+      console.warn(
+        `Anti-cheat violation detected: ${violationType}, Count: ${newCount}`
+      );
+      setLastViolationType(violationType);
+      setIsViolationModalOpen(true);
+
+      if (newCount >= 5) {
+        // Auto-submit. We don't close the modal, it will be replaced by the submit screen.
+        setTimeout(() => handleSubmit(), 2000); // Short delay so user sees the "auto-submit" message
+      }
+    },
+    [handleSubmit]
+  );
+
+  const { violationCount, requestFullscreen } = useAntiCheat({
+    onViolation: handleViolation,
+    enabled: isTestStarted && !isLoading && !isSubmitted, // Only enable when test is active
+  });
+
+  // --- New Handler for Starting Test ---
+  const handleStartTest = () => {
+    requestFullscreen(); // Request fullscreen
+    setIsTestStarted(true); // Hide overlay, show test
+
+    // Initialize the timer
+    const newEndTime = Date.now() + 30 * 60 * 1000;
+    localStorage.setItem("mocktest_endTime", JSON.stringify(newEndTime));
+    setTimeLeft(30 * 60);
+  };
 
   // --- Effects ---
 
-  // FIX: Added logic to prevent test re-entry on page reload.
+  // Effect for loading questions (runs once)
   useEffect(() => {
-    // If a 'started' flag exists in localStorage, it means the user is reloading
-    // an in-progress test. The desired behavior is to end that session and redirect.
     if (localStorage.getItem("mocktest_started") === "true") {
-      // Clear all remnants of the old test.
       localStorage.removeItem("mocktest_questions");
       localStorage.removeItem("mocktest_answers");
       localStorage.removeItem("mocktest_endTime");
       localStorage.removeItem("mocktest_started");
-      // Redirect to the page where new tests are initiated.
-      // window.location.href = "/premocktest";
       router.push("/premocktest");
-      return; // Stop further execution in this component.
+      return;
     }
 
-    // 1. Check for question data. If it's missing, the user probably navigated here directly.
     const questionsDataString = localStorage.getItem("mocktest_questions");
     if (!questionsDataString) {
       router.push("/premocktest");
       return;
     }
 
-    // This is a valid, first-time entry for this test.
-    // Set the 'started' flag to prevent reloads/re-entry.
     localStorage.setItem("mocktest_started", "true");
 
-    // 2. Parse and set questions.
     try {
       const questionsData = JSON.parse(questionsDataString);
       const flattenQuestions = (data) => {
@@ -124,30 +254,23 @@ export default function MockTestPage() {
         }));
         return [...open, ...mcqs];
       };
-
       setAllQuestions(flattenQuestions(questionsData));
-
-      // console.log(flattenQuestions(questionsData))
     } catch (error) {
       console.error("Failed to parse mock test data:", error);
       localStorage.removeItem("mocktest_questions");
-      localStorage.removeItem("mocktest_started"); // Clean up flag if parsing fails
-      window.location.href = "/premocktest"; // Redirect on parsing error
+      localStorage.removeItem("mocktest_started");
+      router.push("/premocktest");
       return;
     }
 
-    // 3. Initialize the timer for a new test session.
-    // We don't need to check for an existing timer since reloads are disabled.
-    const newEndTime = Date.now() + 30 * 60 * 1000;
-    localStorage.setItem("mocktest_endTime", JSON.stringify(newEndTime));
-    setTimeLeft(30 * 60);
+    // Timer logic is MOVED to handleStartTest
+    setIsLoading(false);
+  }, [router]);
 
-    setIsLoading(false); // Mark loading as complete
-  }, []); // Empty dependency array ensures this runs only once on initial mount.
-
-  // FIX: Corrected timer effect. It's now robust and handles auto-submission correctly.
+  // Corrected timer effect
   useEffect(() => {
-    if (isLoading || isSubmitted) return; // Don't run the timer if loading or submitted.
+    // Don't run timer if test hasn't started, is loading, or is submitted
+    if (!isTestStarted || isLoading || isSubmitted) return;
 
     if (timeLeft <= 0) {
       handleSubmit();
@@ -158,8 +281,8 @@ export default function MockTestPage() {
       setTimeLeft((prevTime) => prevTime - 1);
     }, 1000);
 
-    return () => clearInterval(timerId); // Cleanup interval on component unmount or re-render.
-  }, [timeLeft, isLoading, isSubmitted, handleSubmit]);
+    return () => clearInterval(timerId);
+  }, [timeLeft, isTestStarted, isLoading, isSubmitted, handleSubmit]);
 
   const handleAnswerChange = (index, answer) => {
     setAnswers((prev) => ({ ...prev, [index]: answer }));
@@ -175,7 +298,12 @@ export default function MockTestPage() {
     );
   }
 
-  // FIX: Replaced alert() with a dedicated submission screen for a better UX.
+  // Show Start Overlay first
+  if (!isTestStarted) {
+    return <StartTestOverlay onStart={handleStartTest} />;
+  }
+
+  // Show Submission Screen
   if (isSubmitted) {
     return (
       <div className="min-h-screen bg-black text-white flex flex-col justify-center items-center text-center p-8">
@@ -194,6 +322,9 @@ export default function MockTestPage() {
           />
         </svg>
         <h1 className="text-4xl font-bold mb-2">Test Submitted!</h1>
+        {violationCount >= 5 && (
+           <p className="text-red-400 text-lg mb-2">This test was auto-submitted due to {violationCount} violations.</p>
+        )}
         <p className="text-white/70 text-lg">
           Your answers have been recorded. You can now safely close this page.
         </p>
@@ -207,9 +338,18 @@ export default function MockTestPage() {
     );
   }
 
+  // --- Main Test UI ---
   return (
     <div className="min-h-screen bg-black text-white flex font-sans">
-      {/* Collapsible Sidebar for Question Navigation */}
+      {/* Violation Modal */}
+      <ViolationModal
+        isOpen={isViolationModalOpen}
+        onClose={() => setIsViolationModalOpen(false)}
+        violationType={lastViolationType}
+        violationCount={violationCount}
+      />
+
+      {/* Collapsible Sidebar */}
       <aside
         className={`bg-gray-900/80 backdrop-blur-sm border-r border-white/10 transition-all duration-300 ease-in-out ${
           isSidebarOpen ? "w-64 p-4" : "w-0 p-0 overflow-hidden"
@@ -260,7 +400,7 @@ export default function MockTestPage() {
               </span>
             </h1>
           </div>
-          <Timer timeLeft={timeLeft} />
+          <Timer timeLeft={timeLeft} violationCount={violationCount} />
         </header>
 
         {/* Question and Answer Area */}
@@ -269,10 +409,8 @@ export default function MockTestPage() {
             {allQuestions[currentQuestionIndex].text}
           </p>
 
-          {/* Conditional rendering for answer input type */}
           {allQuestions[currentQuestionIndex].type === "open" ? (
             <textarea
-              // FIX: Use `|| ""` to prevent React's uncontrolled/controlled component warning.
               value={answers[currentQuestionIndex] || ""}
               onChange={(e) =>
                 handleAnswerChange(currentQuestionIndex, e.target.value)
@@ -342,3 +480,4 @@ export default function MockTestPage() {
     </div>
   );
 }
+

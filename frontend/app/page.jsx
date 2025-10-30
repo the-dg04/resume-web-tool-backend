@@ -377,12 +377,20 @@ export default function Home() {
                 Profile
               </a>
               {isHydrated && token ? (
+                <>
+                <a
+                href="/premocktest"
+                className="rounded-md border border-white/10 bg-white/5 px-3 py-1.5 text-sm text-white/80 hover:bg-white/10 transition"
+              >
+                Mock test
+              </a>
                 <button
                   onClick={handleLogout}
                   className="rounded-md bg-white/10 px-3 py-1.5 text-sm font-medium text-white hover:bg-white/20 transition"
                 >
                   Sign out
                 </button>
+                </>
               ) : null}
             </div>
           </div>
