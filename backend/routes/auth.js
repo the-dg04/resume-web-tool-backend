@@ -47,8 +47,6 @@ router.post("/login-company", async (req, res) => {
   res.status(200).json({ token });
 });
 
-module.exports = router;
-
 // Get current user profile
 router.get("/me", isLoggedIn, requireUser, async (req, res) => {
   try {
@@ -64,3 +62,5 @@ router.get("/me", isLoggedIn, requireUser, async (req, res) => {
 });
 
 // No user profile update per requirements
+
+module.exports = router;

@@ -10,6 +10,7 @@ const companiesRoutes = require('./routes/companies');
 const rolesRoutes = require('./routes/roles');
 const applicationsRoutes = require('./routes/applications');
 const resumesRoutes = require('./routes/resumes');
+const dbping = require('./routes/dbPing');
 
 const app = express();
 app.set('strict routing', false);
@@ -39,6 +40,7 @@ app.use(express.urlencoded({ extended: true }));
 
 // --- Routes ---
 app.use('/auth', authRoutes);
+app.use('/db', dbping);
 app.use('/api/companies', companiesRoutes);
 app.use('/api/roles', rolesRoutes);
 app.use('/api/applications', applicationsRoutes);
